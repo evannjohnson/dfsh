@@ -54,7 +54,7 @@ error_exit() {
 }
 
 commit() {
-  echo "not implemented"
+  git_df commit "$@"
 }
 
 commitm() {
@@ -156,34 +156,29 @@ main() {
     DFSH_ARGS=()
     shift
 
-    # commands listed below do not process any of the parameters
-    if [[ "$DFSH_COMMAND" =~ ^(enter|git_crypt)$ ]] ; then
-      DFSH_ARGS=("$@")
-    else
-      while [[ $# -gt 0 ]] ; do
-        key="$1"
-        case $key in
-          -D)
-            DEBUG="YES"
-          ;;
-          -F) # used by init(), clone() and upgrade()
-            FORCE="YES"
-          ;;
-          -G) # set the git dir
-            DFSH_REPO="$(qualify_path "$2" "work tree")"
-            shift
-          ;;
-          -T) # set the work tree
-            DFSH_WORK="$(qualify_path "$2" "work tree")"
-            shift
-          ;;
-          *) # any unhandled arguments
-            DFSH_ARGS+=("$1")
-          ;;
-        esac
-        shift
-      done
-    fi
+    while [[ $# -gt 0 ]] ; do
+      key="$1"
+      case $key in
+        -D)
+          DEBUG="YES"
+        ;;
+        -F) # used by init(), clone() and upgrade()
+          FORCE="YES"
+        ;;
+        -G) # set the git dir
+          DFSH_REPO="$(qualify_path "$2" "work tree")"
+          shift
+        ;;
+        -T) # set the work tree
+          DFSH_WORK="$(qualify_path "$2" "work tree")"
+          shift
+        ;;
+        *) # any unhandled arguments
+          DFSH_ARGS+=("$1")
+        ;;
+      esac
+      shift
+    done
 
     [ ! -d "$DFSH_WORK" ] && error_exit "Work tree does not exist: [$DFSH_WORK]"
 
