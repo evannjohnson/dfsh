@@ -23,6 +23,14 @@ error_exit() {
     exit 1
 }
 
+commit() {
+    echo "not implemented"
+}
+
+commitm() {
+    echo "not implemented"
+}
+
 ensure_up_to_date() {
     git_df fetch --all --prune
     git_df branch -r | grep -v '\->' | while read remote; do
@@ -64,7 +72,7 @@ git_command() {
     return "$?"
 }
 
-function help() {
+help() {
 
     local msg
     IFS='' read -r -d '' msg <<EOF
@@ -80,7 +88,7 @@ main() {
 
     # parse command line arguments
     local retval=0
-    internal_commands="^(commit|help|--help)$"
+    internal_commands="^(commit|commitm|help|--help)$"
     if [ -z "$*" ]; then
         # no argumnts will result in help()
         help
@@ -90,6 +98,45 @@ main() {
         DFSH_COMMAND="${DFSH_COMMAND/__/}"
         DFSH_ARGS=()
         shift
+
+        # commands listed below do not process any of the parameters
+        if [[ "$DFSH_COMMAND" =~ ^(enter|git_crypt)$ ]] ; then
+          DFSH_ARGS=("$@")
+        else
+          while [[ $# -gt 0 ]] ; do
+            key="$1"
+            case $key in
+              -a) # used by list()
+                LIST_ALL="YES"
+              ;;
+              -d) # used by all commands
+                DEBUG="YES"
+              ;;
+              -f) # used by init(), clone() and upgrade()
+                FORCE="YES"
+              ;;
+              -l) # used by decrypt()
+                DO_LIST="YES"
+                [[ "$DFSH_COMMAND" =~ ^(clone|config)$ ]] && DFSH_ARGS+=("$1")
+              ;;
+              -w) # used by init() and clone()
+                DFSH_WORK="$(qualify_path "$2" "work tree")"
+                shift
+              ;;
+              *) # any unhandled arguments
+                DFSH_ARGS+=("$1")
+              ;;
+            esac
+            shift
+          done
+        fi
+
+        [ ! -d "$WORK_TREE" ] && error_out "Work tree does not exist: [$WORK_TREE]"
+
+        # not using hooks for now
+        # HOOK_COMMAND="$DFSH_COMMAND"
+        # invoke_hook "pre"
+
         $DFSH_COMMAND "${DFSH_ARGS[@]}"
     else
         # any other commands are simply passed through to git
@@ -104,7 +151,10 @@ DEBUG=1
 
 # GIT_DIR="$HOME/.cfg"
 # WORK_TREE="$HOME/sandbox/dotfiles-repo"
-GIT_DIR="$HOME/sandbox/dotfiles-repo/.git"
+# GIT_DIR="$HOME/sandbox/dotfiles-repo/.git"
+# WORK_TREE="$HOME/sandbox/dotfiles-repo"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+GIT_DIR="$SCRIPT_DIR/sandbox/dotfiles-repo/.git"
 WORK_TREE="$HOME/sandbox/dotfiles-repo"
 MAIN_BRANCH="main"
 BRANCH="$(git_df rev-parse --abbrev-ref HEAD)"
