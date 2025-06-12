@@ -16,6 +16,8 @@ GIT_PROGRAM="git"
 BRANCH="" # set in main
 
 git_df() {
+    require_repo
+    debug "running: $GIT_PROGRAM $*"
     "$GIT_PROGRAM" --git-dir="$GIT_DIR" --work-tree="$WORK_TREE" "$@"
     return "$?"
 }
@@ -78,13 +80,6 @@ ensure_up_to_date() {
 
 stop_if_on_main() {
     [ "$(git_df rev-parse --abbrev-ref HEAD)" = "$MAIN_BRANCH" ] && error_exit "HEAD is on $MAIN_BRANCH, switch to machine branch and try again"
-}
-
-git_command() {
-    require_repo
-    debug "Running git command $GIT_PROGRAM $*"
-    git_df "$@"
-    return "$?"
 }
 
 help() {
@@ -165,10 +160,10 @@ main() {
         # HOOK_COMMAND="$DFSH_COMMAND"
         # invoke_hook "pre"
 
-        $DFSH_COMMAND "${DFSH_ARGS[@]}"
+        $DFSH_COMMAND "${DFSH_ARGS[@]:-}"
     else
         # any other commands are simply passed through to git
-        git_command "$@"
+        git_df "$@"
         retval="$?"
     fi
 }
