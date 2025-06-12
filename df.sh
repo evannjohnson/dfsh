@@ -1,5 +1,20 @@
 #!/bin/bash
 
+set -eEuo pipefail
+trap 'echo "Error occurred at line $LINENO"' ERR
+
+DEBUG=1
+# GIT_DIR="$HOME/.cfg"
+# WORK_TREE="$HOME/sandbox/dotfiles-repo"
+# GIT_DIR="$HOME/sandbox/dotfiles-repo/.git"
+# WORK_TREE="$HOME/sandbox/dotfiles-repo"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+GIT_DIR="$SCRIPT_DIR/test/test-env/.dotfiles"
+WORK_TREE="$SCRIPT_DIR/test/test-env"
+MAIN_BRANCH="main"
+GIT_PROGRAM="git"
+BRANCH="" # set in main
+
 git_df() {
     "$GIT_PROGRAM" --git-dir="$GIT_DIR" --work-tree="$WORK_TREE" "$@"
     return "$?"
@@ -73,18 +88,31 @@ git_command() {
 }
 
 help() {
-
-    local msg
-    IFS='' read -r -d '' msg <<EOF
+    cat <<EOF
 help will go here
 EOF
-    printf '%s\n' "$msg"
     exit
+}
+
+# echo replacements
+function echo() {
+  IFS=' '
+  printf '%s\n' "$*"
+}
+function echo_n() {
+  IFS=' '
+  printf '%s' "$*"
+}
+function echo_e() {
+  IFS=' '
+  printf '%b\n' "$*"
 }
 
 main() {
     require_git
     require_repo
+
+    BRANCH="$(git_df rev-parse --abbrev-ref HEAD)"
 
     # parse command line arguments
     local retval=0
@@ -144,20 +172,5 @@ main() {
         retval="$?"
     fi
 }
-
-set -eEuo pipefail
-trap 'echo "Error occurred at line $LINENO"' ERR
-DEBUG=1
-
-# GIT_DIR="$HOME/.cfg"
-# WORK_TREE="$HOME/sandbox/dotfiles-repo"
-# GIT_DIR="$HOME/sandbox/dotfiles-repo/.git"
-# WORK_TREE="$HOME/sandbox/dotfiles-repo"
-SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-GIT_DIR="$SCRIPT_DIR/sandbox/dotfiles-repo/.git"
-WORK_TREE="$HOME/sandbox/dotfiles-repo"
-MAIN_BRANCH="main"
-BRANCH="$(git_df rev-parse --abbrev-ref HEAD)"
-GIT_PROGRAM="git"
 
 main "$@"
