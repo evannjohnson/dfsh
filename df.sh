@@ -48,6 +48,11 @@ commitm() {
     echo "not implemented"
 }
 
+# print tracked files
+ls() {
+    echo "$(cd "$HOME"; git_df ls-tree -r main --name-only)"
+}
+
 ensure_up_to_date() {
     git_df fetch --all --prune
     git_df branch -r | grep -v '\->' | while read remote; do
@@ -111,7 +116,7 @@ main() {
 
     # parse command line arguments
     local retval=0
-    internal_commands="^(commit|commitm|help|--help)$"
+    internal_commands="^(commit|commitm|ls|help|--help)$"
     if [ -z "$*" ]; then
         # no argumnts will result in help()
         help
