@@ -54,6 +54,13 @@ error_exit() {
 }
 
 commit() {
+  # if [ -z "${FORCE:-}" ]; then
+  #   stop_if_on_main
+  #   ensure_up_to_date
+  # fi
+  stop_if_on_main
+  # ensure_up_to_date
+
   git_df commit "$@"
 }
 
@@ -98,10 +105,13 @@ ensure_up_to_date() {
     git_df branch --track "${remote#origin/}" "$remote"
   done
 
+  current_branch="$(git_df rev-parse --abbrev-ref HEAD)"
+
   for remote_branch in $(git branch -r | grep -v '\->'); do
     local_branch=${remote_branch#origin/}
 
-    if [ "$local_branch" = "$MAIN_BRANCH" ]; then
+    # ensures that the current branch and main are both up to date
+    if [ "$local_branch" = "$MAIN_BRANCH" ] || [ "$local_branch" = "$current_branch" ]; then
       # handle main
       if git show-ref --quiet refs/heads/"$local_branch"; then
         local_commit=$(git rev-parse "$local_branch")
@@ -114,7 +124,7 @@ ensure_up_to_date() {
         error_exit "No local branch tracking '$remote_branch'"
       fi
     # elif [ "$local_branch" = "$current_branch" ]; then
-    #     # handle this machine's branch
+        # handle this machine's branch
     # else [ ]; then
     # handle other machine's branches
     fi
@@ -122,7 +132,10 @@ ensure_up_to_date() {
 }
 
 stop_if_on_main() {
-  [ "$(git_df rev-parse --abbrev-ref HEAD)" = "$MAIN_BRANCH" ] && error_exit "HEAD is on $MAIN_BRANCH, switch to machine branch and try again"
+  if [ "$(git_df rev-parse --abbrev-ref HEAD)" = "$MAIN_BRANCH" ];
+  then
+    error_exit "HEAD is on $MAIN_BRANCH, switch to machine branch and try again"
+  fi
 }
 
 help() {
