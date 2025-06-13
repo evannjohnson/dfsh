@@ -3,7 +3,7 @@
 set -eEuo pipefail
 trap 'echo "Error occurred at line $LINENO"' ERR
 
-DEBUG=1
+DEBUG=""
 # DFSH_REPO="$HOME/.cfg"
 # DFSH_WORK="$HOME/sandbox/dotfiles-repo"
 # DFSH_REPO="$HOME/sandbox/dotfiles-repo/.git"
@@ -14,6 +14,7 @@ DFSH_WORK="${DFSH_WORK:-$SCRIPT_DIR/test/test-env}"
 MAIN_BRANCH="main"
 GIT_PROGRAM="git"
 
+
 git_df() {
   require_repo
   debug "running: $GIT_PROGRAM --git-dir=\"$DFSH_REPO\" --work-tree=\"$DFSH_WORK\" $*"
@@ -21,8 +22,17 @@ git_df() {
   return "$?"
 }
 
+_git() {
+  require_repo
+  "$GIT_PROGRAM" --git-dir="$DFSH_REPO" --work-tree="$DFSH_WORK" "$@"
+  return "$?"
+}
+
 debug() {
-  [ -n "$DEBUG" ] && printf 'DEBUG: %b\n' "$*"
+  if [ -n "$DEBUG" ];
+  then
+    printf 'DEBUG: %b\n' "$*"
+  fi
 }
 
 require_repo() {
@@ -58,8 +68,8 @@ commit() {
   #   stop_if_on_main
   #   ensure_up_to_date
   # fi
-  stop_if_on_main
-  # ensure_up_to_date
+  # stop_if_on_main
+  ensure_up_to_date
 
   git_df commit "$@"
 }
@@ -70,9 +80,14 @@ commitm() {
 
 clone() {
   "$GIT_PROGRAM" clone --bare "$@" "$DFSH_REPO"
+  configure_repo
+}
 
+configure_repo() {
   # by default, do not show untracked files and directories
   git_df config status.showUntrackedFiles no
+  # this is necessary to have remote tracking branches, which I use to check if the local repo is up to date with the remote
+  git_df config --local --add remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
 }
 
 # demonstrate common control structures
@@ -100,22 +115,19 @@ ls() {
 }
 
 ensure_up_to_date() {
-  git_df fetch --all --prune
-  git_df branch -r | grep -v '\->' | while read remote; do
-    git_df branch --track "${remote#origin/}" "$remote"
-  done
-
   current_branch="$(git_df rev-parse --abbrev-ref HEAD)"
 
-  for remote_branch in $(git branch -r | grep -v '\->'); do
+  git_df fetch --quiet origin
+
+  for remote_branch in $(_git branch -r | grep -v '\->'); do
     local_branch=${remote_branch#origin/}
 
     # ensures that the current branch and main are both up to date
     if [ "$local_branch" = "$MAIN_BRANCH" ] || [ "$local_branch" = "$current_branch" ]; then
       # handle main
-      if git show-ref --quiet refs/heads/"$local_branch"; then
-        local_commit=$(git rev-parse "$local_branch")
-        remote_commit=$(git rev-parse "$remote_branch")
+      if _git show-ref --quiet refs/heads/"$local_branch"; then
+        local_commit=$(_git rev-parse "$local_branch")
+        remote_commit=$(_git rev-parse "$remote_branch")
 
         if [ "$local_commit" != "$remote_commit" ]; then
           error_exit "Local branch '$local_branch' is not up-to-date with '$remote_branch', could be ahead or behind"
