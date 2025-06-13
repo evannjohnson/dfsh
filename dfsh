@@ -10,23 +10,29 @@ DEBUG=""
 # DFSH_REPO="$HOME/sandbox/dotfiles-repo/.git"
 # DFSH_WORK="$HOME/sandbox/dotfiles-repo"
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-DFSH_REPO="${DFSH_REPO:-$SCRIPT_DIR/test/test-env/.dotfiles}"
-DFSH_WORK="${DFSH_WORK:-$SCRIPT_DIR/test/test-env}"
+# DFSH_REPO="${DFSH_REPO:-$SCRIPT_DIR/test/test-env/.dotfiles}"
+# DFSH_WORK="${DFSH_WORK:-$SCRIPT_DIR/test/test-env}"
+DFSH_REPO="${DFSH_REPO:-$HOME/.dotfiles}"
+DFSH_WORK="${DFSH_WORK:-$HOME}"
 MAIN_BRANCH="main"
 GIT_PROGRAM="git"
 
+R='\033[0;31m'
+O='\033[0;33m'
+Y='\033[1;33m'
+G='\033[0;32m'
+B='\033[0;34m'
+V='\033[0;35m'
+NC='\033[0m' # no color
 
 git_df() {
   require_repo
-  debug "running: $GIT_PROGRAM --git-dir=\"$DFSH_REPO\" --work-tree=\"$DFSH_WORK\" $*"
-  "$GIT_PROGRAM" --git-dir="$DFSH_REPO" --work-tree="$DFSH_WORK" "$@"
-  return "$?"
+  # debug "running: $GIT_PROGRAM --git-dir=\"$DFSH_REPO\" --work-tree=\"$DFSH_WORK\" $*"
+  _git "$@"
 }
 
 _git() {
-  require_repo
   "$GIT_PROGRAM" --git-dir="$DFSH_REPO" --work-tree="$DFSH_WORK" "$@"
-  return "$?"
 }
 
 debug() {
@@ -81,9 +87,99 @@ commitm() {
   echo "not implemented"
 }
 
+pushm() {
+  echo "not implemented"
+}
+
 clone() {
   "$GIT_PROGRAM" clone --bare "$@" "$DFSH_REPO"
   configure_repo
+  # set up remote tracking branches
+  git_df fetch
+}
+
+status() {
+  git_df status ${@:+"$@"}
+  echo
+
+  # check if main is up to date
+  local_commit=$(_git rev-parse "$MAIN_BRANCH")
+  remote_commit=$(_git rev-parse "origin/$MAIN_BRANCH")
+
+  if [ "$local_commit" = "$remote_commit" ];
+  then
+    # main up to date with remote, don't do anything
+    true
+  elif _git merge-base --is-ancestor "$local_commit" "$remote_commit";
+  then
+    printf "${Y}main${O} is behind ${Y}origin/main${NC}\n"
+  elif _git merge-base --is-ancestor "$remote_commit" "$local_commit";
+  then
+    printf "${Y}main${O} is ahead of ${Y}origin/main${NC}\n"
+  else
+    printf "${Y}main${O} has diverged with ${Y}origin/main${NC}\n"
+  fi
+
+  show_last_fetch_time
+
+  # check if there are any stashes
+  if [ -n "$(_git stash list)" ];
+  then
+    printf "${B}There are dotfiles stashes:${NC}\n"
+    git_df stash list
+  fi
+}
+
+show_last_fetch_time() {
+  last_fetch=$(_git reflog show --date=unix origin/HEAD 2>/dev/null | head -1 | grep -o '[0-9]\{10\}') || error_exit "Error getting last fetch time, try running dfsh fetch"
+
+  if [ -z "$last_fetch" ]; then
+    echo "No fetch history found or not in a git repository"
+    exit 1
+  fi
+
+  current_time=$(date +%s)
+  diff_seconds=$((current_time - last_fetch))
+
+  weeks=$((diff_seconds / 604800))
+  days=$(((diff_seconds % 604800) / 86400))
+  hours=$(((diff_seconds % 86400) / 3600))
+  minutes=$(((diff_seconds % 3600) / 60))
+
+  if [ $weeks -gt 0 ]; then
+    if [ $weeks -gt 1 ]; then
+      printf "${R}Last fetch: ${weeks} weeks ago${NC}\n"
+    else
+      printf "${R}Last fetch: ${weeks} week ago${NC}\n"
+    fi
+    fetch=1
+  elif [ $days -gt 0 ]; then
+    if [ $days -gt 1 ]; then
+      printf "${O}Last fetch: ${Y}${days}${O} days ago${NC}\n"
+    else
+      printf "${O}Last fetch: ${Y}${days}${O} day ago${NC}\n"
+    fi
+    fetch=1
+  # elif [ $hours -gt 0 ]; then
+  #   if [ $hours -gt 1 ]; then
+  #     printf "${O}Last fetch: ${Y}${hours}${O} hours ago${NC}\n"
+  #   else
+  #     printf "${O}Last fetch: ${Y}${hours}${O} hour ago${NC}\n"
+  #   fi
+  # else
+    # printf "${G}Last fetch: ${minutes} minutes ago${NC}\n"
+  fi
+
+  if [ -n "${fetch:-}" ]; then
+    git_df fetch
+  fi
+}
+
+# fast-forward a branch without checking it out
+# should error if can't fast-forward
+pull_branch() {
+  git_df fetch origin
+  git_df push "$DFSH_REPO" "origin/$1:$1"
 }
 
 configure_repo() {
@@ -146,10 +242,24 @@ ensure_up_to_date() {
   done
 }
 
+# $1: the branch to ensure is based on main
+ensure_based_on_main() {
+  if ! git_df merge-base --is-ancestor "$MAIN_BRANCH" "$1";
+  then
+    error_exit "Branch $1 is not based on $MAIN_BRANCH, rebase it"
+  fi
+}
+
+# $1: the branch to rebase onto main
+# rebase_onto_main() {
+
+# }
+
 stop_if_on_main() {
   if [ "$(git_df rev-parse --abbrev-ref HEAD)" = "$MAIN_BRANCH" ];
   then
-    error_exit "HEAD is on $MAIN_BRANCH, switch to machine branch and try again"
+    error_exit "HEAD is on $MAIN_BRANCH, switch to machine branch and try again, or use -F to skip this check
+    (ex. dfsh commit -F -m message)"
   fi
 }
 
