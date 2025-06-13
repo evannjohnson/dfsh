@@ -35,6 +35,13 @@ _git() {
   "$GIT_PROGRAM" --git-dir="$DFSH_REPO" --work-tree="$DFSH_WORK" "$@"
 }
 
+# strict mode causes a git error in _git to halt the script and print "error at line x"
+# when simply passing through an unhandled command to git, I dont' want this "error at line x" message
+# using || catches a nonzero exit code to prevent strict mode trigger
+_git_passthrough() {
+  "$GIT_PROGRAM" --git-dir="$DFSH_REPO" --work-tree="$DFSH_WORK" "$@" || true
+}
+
 debug() {
   if [ -n "$DEBUG" ];
   then
@@ -80,7 +87,7 @@ commit() {
     true
   fi
 
-  git_df commit "$@"
+  git_df commit ${@:+"$@"}
 }
 
 commitm() {
@@ -210,26 +217,56 @@ example_command() {
 
 # print tracked files
 ls() {
-    while [[ $# -gt 0 ]] ; do
+  paths=()
+  while [[ $# -gt 0 ]] ; do
     case "$1" in
       --untracked|-u)
+        untracked=true
         # do something
-        git_df ls-files --others --exclude-standard "$(pwd)"
-        return
+        # git_df ls-files --others --exclude-standard "$(pwd)"
+        # return
       ;;
       --all|-a)
+        all=true
         # do something
-        echo "$(cd "$HOME"; git_df ls-tree -r main --name-only)"
-        return
+        # echo "$(cd "$HOME"; git_df ls-tree -r main --name-only)"
+        # return
       ;;
       *)
-        args+=("$1")
+        paths+=("$1")
       ;;
     esac
     shift
   done
 
-  git_df ls-tree -r main --name-only
+  if [ -n "${untracked:-}" ];
+  then
+    if [ -n "${all:-}" ];
+    then
+      echo "$(cd "$DFSH_WORK"; git_df ls-files --others --exclude-standard)"
+    elif [ ${#paths[@]} -gt 0 ];
+    then
+      for path in "${paths[@]}"
+      do
+        echo "$(cd "$path"; git_df ls-files --others --exclude-standard)"
+      done
+    else
+      git_df ls-files --others --exclude-standard
+    fi
+  else
+    if [ -n "${all:-}" ];
+    then
+      echo "$(cd "$DFSH_WORK"; git_df ls-tree -r main --name-only)"
+    elif [ ${#paths[@]} -gt 0 ];
+    then
+      for path in "${paths[@]}"
+      do
+        echo "$(cd "$path"; git_df ls-tree -r main --name-only)"
+      done
+    else
+      git_df ls-tree -r main --name-only
+    fi
+  fi
 }
 
 ensure_up_to_date() {
@@ -346,7 +383,7 @@ main() {
     $DFSH_COMMAND "${DFSH_ARGS[@]:-}"
   else
       # any other commands are simply passed through to git
-      git_df "$@"
+      _git_passthrough "$@"
       retval="$?"
   fi
 }
