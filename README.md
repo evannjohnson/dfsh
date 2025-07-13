@@ -2,6 +2,12 @@ a dotfiles tool
 
 structure of the script is inspired by yadm
 
+# added commands
+- `ls`: lists tracked files under the current directory
+  - `--all`: list all files instead of under current dir
+    - like `cd`ing to `$DFSH_WORK` and running `dfsh ls`
+  - `--untracked`: list untracked files instead of tracked files 
+
 # tasks
 Script implemented as a wrapper for git that demonstrates how to add new commands and wrap existing ones to modify their functionality. Very little additional functionality present at this point.
 
