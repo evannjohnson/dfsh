@@ -138,7 +138,8 @@ status() {
 }
 
 show_last_fetch_time() {
-  last_fetch=$(_git reflog show --date=unix origin/HEAD 2>/dev/null | head -1 | grep -o '[0-9]\{10\}') || error_exit "Error getting last fetch time, try running dfsh fetch"
+  # last_fetch=$(_git reflog show --date=unix origin/HEAD 2>/dev/null | head -1 | grep -o '[0-9]\{10\}') || error_exit "Error getting last fetch time, try running dfsh fetch"
+  last_fetch=$(stat -c %Y "$DFSH_REPO/FETCH_HEAD" 2>/dev/null || stat -f %m "$DFSH_REPO/FETCH_HEAD" 2>/dev/null)
 
   if [ -z "$last_fetch" ]; then
     echo "No fetch history found or not in a git repository"
